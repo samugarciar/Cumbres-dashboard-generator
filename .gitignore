@@ -1,0 +1,40 @@
+# ── Entornos virtuales ──
+venv/
+.venv/
+env/
+.env/
+
+# ── Python cache ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# ── Distribución / Build ──
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ── Credenciales y secretos (CRITICO) ──
+.streamlit/
+
+# ── Datos persistidos (datasets locales) ──
+data/
+
+# ── IDE / Editor ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Jupyter ──
+.ipynb_checkpoints/
+
+# ── Logs ──
+*.log
