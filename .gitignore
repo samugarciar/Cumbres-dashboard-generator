@@ -20,7 +20,7 @@ build/
 .streamlit/
 
 # ── Datos persistidos (datasets locales) ──
-data/
+data/datasets/
 
 # ── IDE / Editor ──
 .vscode/

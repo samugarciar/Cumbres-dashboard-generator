@@ -164,3 +164,86 @@ def delete_dataset(dataset_id: str) -> bool:
 
     _save_registry(new_registry)
     return deleted
+
+
+def save_sheets_connection(
+    df: pd.DataFrame,
+    name: str,
+    format_id: str,
+    sheet_url: str,
+    worksheet_name: str,
+    dataset_id: Optional[str] = None,
+) -> Dict:
+    """Guarda una conexión de Google Sheets y su caché Parquet.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Datos descargados y preparados.
+    name : str
+        Nombre descriptivo de la conexión.
+    format_id : str
+        ID del formato al que pertenece.
+    sheet_url : str
+        URL o ID del Google Sheet.
+    worksheet_name : str
+        Nombre de la pestaña.
+    dataset_id : str, optional
+        Si se proporciona, actualiza la conexión existente (sincronización).
+
+    Returns
+    -------
+    dict
+        Entrada del registro (nueva o actualizada).
+    """
+
+    _ensure_dirs()
+    registry = _load_registry()
+    now = datetime.now().isoformat(timespec="seconds")
+
+    if dataset_id:
+        # ── Actualizar existente ──
+        entry = None
+        for d in registry:
+            if d["id"] == dataset_id:
+                entry = d
+                break
+        if entry is None:
+            raise ValueError(f"Conexión '{dataset_id}' no encontrada.")
+
+        df.to_parquet(entry["file_path"], index=False)
+        entry["updated_at"] = now
+        entry["row_count"] = len(df)
+        entry["sheet_url"] = sheet_url
+        entry["worksheet_name"] = worksheet_name
+        if name:
+            entry["name"] = name
+    else:
+        # ── Crear nuevo ──
+        dataset_id = uuid.uuid4().hex[:8]
+        safe_name = (
+            "".join(c if c.isalnum() or c in "-_ " else "" for c in name)
+            .strip()
+            .replace(" ", "_")
+            .lower()
+        )
+        file_path = str(DATASETS_DIR / f"{dataset_id}_{safe_name}.parquet")
+        df.to_parquet(file_path, index=False)
+
+        entry = {
+            "id": dataset_id,
+            "name": name,
+            "format": format_id,
+            "source": "sheets",
+            "sheet_url": sheet_url,
+            "worksheet_name": worksheet_name,
+            "uploaded_at": now,
+            "updated_at": now,
+            "row_count": len(df),
+            "file_path": file_path,
+        }
+        registry.append(entry)
+
+    _save_registry(registry)
+    return entry
+
