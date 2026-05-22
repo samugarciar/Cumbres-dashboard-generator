@@ -74,6 +74,11 @@ class BaseFormat(ABC):
         df = df.replace(r'^\s*$', pd.NA, regex=True)
         df = df.dropna(how="all").copy()
 
+        # ── 1.5. Normalizar todas las columnas tipo string a minúsculas y limpiarlas ──
+        for col_name, spec in self.columns.items():
+            if spec.type == "string" and col_name in df.columns:
+                df[col_name] = df[col_name].fillna("").astype(str).str.strip().str.lower()
+
         # ── 2. Parseo robusto de fechas ──
         if self.date_column and self.date_column in df.columns:
             # Si ya es datetime, no lo re-parseamos

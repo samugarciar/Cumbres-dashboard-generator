@@ -56,16 +56,13 @@ class CitasInmobiliarias(BaseFormat):
         df = super().prepare(df)
 
         if "Inmueble" in df.columns:
-            # Asegurarse de que sea string y limpiar espacios externos
-            df["Inmueble"] = df["Inmueble"].astype(str).str.strip()
+            # Perez -> b. perez
+            perez_mask = df["Inmueble"].str.contains("perez", case=False, na=False)
+            df.loc[perez_mask, "Inmueble"] = "b. perez"
 
-            # Perez -> b. Perez
-            perez_mask = df["Inmueble"].str.contains("Perez", case=False, na=False)
-            df.loc[perez_mask, "Inmueble"] = "b. Perez"
-
-            # norteamerica -> Fl. Norteamerica
+            # norteamerica -> fl. norteamerica
             norte_mask = df["Inmueble"].str.contains("norteamerica", case=False, na=False)
-            df.loc[norte_mask, "Inmueble"] = "Fl. Norteamerica"
+            df.loc[norte_mask, "Inmueble"] = "fl. norteamerica"
 
         return df
 
