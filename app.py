@@ -18,6 +18,107 @@ from components.format_builder import render_format_builder
 from data_loader import load_data
 import data_manager
 import format_manager
+import datetime
+
+
+@st.dialog("Confirmar Citas")
+def show_confirm_dialog(full_df):
+    st.markdown(
+        """
+        <style>
+        .confirm-subtitle {
+            color: rgba(224, 224, 255, 0.6);
+            font-size: 0.88rem;
+            margin-bottom: 16px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    st.markdown('<p class="confirm-subtitle">Selecciona el día de las citas que deseas verificar y confirmar para enviar al workflow de n8n.</p>', unsafe_allow_html=True)
+    
+    # Intentar extraer las fechas de las citas
+    if "Fecha" in full_df.columns:
+        try:
+            fechas_disponibles = pd.to_datetime(full_df["Fecha"]).dt.date.unique()
+            fechas_disponibles = sorted(list(fechas_disponibles))
+            min_val = fechas_disponibles[0] if fechas_disponibles else datetime.date.today()
+            max_val = fechas_disponibles[-1] if fechas_disponibles else datetime.date.today()
+        except Exception:
+            min_val = datetime.date.today() - datetime.timedelta(days=365)
+            max_val = datetime.date.today() + datetime.timedelta(days=365)
+    else:
+        min_val = datetime.date.today()
+        max_val = datetime.date.today()
+        
+    selected_date = st.date_input(
+        "Fecha de citas a confirmar",
+        value=datetime.date.today(),
+        min_value=min_val,
+        max_value=max_val,
+        key="confirm_date_picker"
+    )
+    
+    # Filtrar citas de esa fecha
+    citas_dia = pd.DataFrame()
+    if "Fecha" in full_df.columns:
+        citas_dia = full_df[pd.to_datetime(full_df["Fecha"]).dt.date == selected_date]
+        
+    if not citas_dia.empty:
+        st.success(f"🔍 Encontradas **{len(citas_dia)}** citas para el **{selected_date.strftime('%d/%m/%Y')}**.")
+        # Mostrar resumen interactivo y limpio
+        cols_to_show = [c for c in ["Hora", "Inmueble", "Asesor", "Tercero", "Telefono"] if c in citas_dia.columns]
+        resumen_df = citas_dia[cols_to_show].copy()
+        if "Tercero" in resumen_df.columns:
+            resumen_df = resumen_df.rename(columns={"Tercero": "Cliente"})
+        if "Telefono" in resumen_df.columns:
+            resumen_df = resumen_df.rename(columns={"Telefono": "Teléfono"})
+            
+        st.dataframe(resumen_df.fillna(""), use_container_width=True, hide_index=True)
+    else:
+        st.warning(f"⚠️ No hay citas registradas en los datos para el **{selected_date.strftime('%d/%m/%Y')}**.")
+        
+    st.markdown("---")
+    
+    # Obtener el webhook de los secretos o de un input fallback
+    webhook_url = st.secrets.get("n8n_webhook_url", "")
+    if not webhook_url:
+        st.info("ℹ️ Define `n8n_webhook_url` en tus secretos de Streamlit para automatizar esto en producción. Mientras tanto, puedes ingresarlo aquí:")
+        webhook_url = st.text_input("URL del Webhook de n8n", placeholder="https://tu-n8n.com/webhook/...", key="confirm_webhook_fallback")
+        
+    # Deshabilitar si no hay citas en la fecha elegida
+    btn_disabled = citas_dia.empty or not webhook_url
+    
+    if st.button("🚀 Confirmar y Enviar a n8n", type="primary", use_container_width=True, disabled=btn_disabled):
+        if not webhook_url:
+            st.error("Por favor proporciona una URL de webhook válida.")
+            return
+            
+        with st.spinner("⏳ Enviando confirmación al workflow de n8n..."):
+            try:
+                import requests
+                # Convertir fechas/horas a strings para el JSON
+                citas_json = citas_dia.copy()
+                for col in citas_json.columns:
+                    if pd.api.types.is_datetime64_any_dtype(citas_json[col]):
+                        citas_json[col] = citas_json[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+                
+                payload = {
+                    "fecha_confirmacion": selected_date.isoformat(),
+                    "total_citas": len(citas_dia),
+                    "citas": citas_json.fillna("").to_dict(orient="records")
+                }
+                
+                response = requests.post(webhook_url, json=payload, timeout=15)
+                if response.status_code in [200, 201]:
+                    st.toast("✅ Citas enviadas a n8n con éxito.")
+                    st.success("🎉 ¡El webhook de confirmación se envió correctamente!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Error de n8n (Código {response.status_code}): {response.text}")
+            except Exception as e:
+                st.error(f"❌ Error de conexión al enviar el webhook: {e}")
 
 
 def read_csv_smart(file_obj, header):
@@ -392,6 +493,29 @@ else:
 if df_filtered.empty:
     st.warning("No hay datos para el rango de fechas seleccionado.")
     st.stop()
+
+# ── Panel de Acciones Rápidas (Solo para Citas Inmobiliarias) ──────
+if fmt.id == "citas_inmobiliarias":
+    col_text, col_btn = st.columns([3, 1])
+    with col_text:
+        st.markdown(
+            """
+            <div style="background: rgba(24, 255, 255, 0.05); border: 1px solid rgba(24, 255, 255, 0.15); padding: 14px 20px; border-radius: 12px; height: 100%; display: flex; align-items: center;">
+                <div>
+                    <span style="color:#18ffff; font-weight:700; font-size: 1.05rem; display:block;">⚡ Acciones de Gestión</span>
+                    <span style="color:rgba(224, 224, 255, 0.65); font-size:0.85rem; margin-top: 4px; display: block;">
+                        Verifica y confirma el estado de las citas programadas para cualquier día enviándolas directamente a n8n.
+                    </span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col_btn:
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        if st.button("🔔 Confirmar Citas", type="primary", use_container_width=True, key="btn_confirmar_citas_trigger"):
+            show_confirm_dialog(df)
+    st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 6. KPIs
