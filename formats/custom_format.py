@@ -127,7 +127,11 @@ class CustomFormat(BaseFormat):
             .sort_values("Total", ascending=False)
         )
 
-        # Donut
+        # Donut — ocultar etiquetas de segmentos pequeños (< 5%)
+        total = group_counts["Total"].sum()
+        pcts = group_counts["Total"] / total if total > 0 else group_counts["Total"]
+        text_positions = ["outside" if p >= 0.05 else "none" for p in pcts]
+
         fig_donut = px.pie(
             group_counts,
             names=grouping,
@@ -137,7 +141,7 @@ class CustomFormat(BaseFormat):
         )
         fig_donut.update_traces(
             textinfo="percent+label",
-            textposition="outside",
+            textposition=text_positions,
             textfont=dict(color="rgba(224,224,255,0.8)", size=12),
             marker=dict(line=dict(color="#0f0c29", width=2)),
             hovertemplate=(

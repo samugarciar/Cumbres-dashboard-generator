@@ -9,6 +9,7 @@ Soporta modo "constructor de formatos" para crear formatos desde la UI.
 
 import streamlit as st
 import pandas as pd
+import csv
 
 from components.sidebar import render_sidebar
 from components.kpi_cards import render_kpi_row
@@ -17,6 +18,24 @@ from components.format_builder import render_format_builder
 from data_loader import load_data
 import data_manager
 import format_manager
+
+
+def read_csv_smart(file_obj, header):
+    file_obj.seek(0)
+    sample = file_obj.read(4096)
+    if isinstance(sample, bytes):
+        sample_text = sample.decode("utf-8", errors="ignore")
+    else:
+        sample_text = sample
+
+    try:
+        dialect = csv.Sniffer().sniff(sample_text, delimiters=";,|\t")
+        sep = dialect.delimiter
+    except Exception:
+        sep = ","
+
+    file_obj.seek(0)
+    return pd.read_csv(file_obj, header=header, sep=sep)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 1. CONFIGURACIÓN DE PÁGINA
@@ -182,7 +201,7 @@ elif config["source"] == "upload_new":
     try:
         if uploaded_file.name.endswith(".csv"):
             header_opt = 0 if first_row_header else None
-            df = pd.read_csv(uploaded_file, header=header_opt)
+            df = read_csv_smart(uploaded_file, header_opt)
         else:
             header_opt = 0 if first_row_header else None
             df = pd.read_excel(uploaded_file, header=header_opt)
@@ -227,7 +246,7 @@ elif config["source"] == "local":
     if update_file:
         try:
             if update_file.name.endswith(".csv"):
-                df_new = pd.read_csv(update_file)
+                df_new = read_csv_smart(update_file, 0)
             else:
                 df_new = pd.read_excel(update_file)
         except Exception as exc:

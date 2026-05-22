@@ -65,17 +65,51 @@ class BaseFormat(ABC):
     # ── Preparación ─────────────────────────────────────────────
 
     def prepare(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Limpia y prepara el DataFrame (parseo de fechas, etc.).
+        """Limpia y prepara el DataFrame (parseo robusto de fechas, eliminación de filas vacías, etc.).
 
-        Se ejecuta *después* de la validación.  Si la columna de fecha ya
-        tiene dtype datetime, no la reparsea.
+        Se ejecuta después de la validación.
         """
 
+        # ── 1. Eliminar filas completamente vacías o con solo espacios ──
+        df = df.replace(r'^\s*$', pd.NA, regex=True)
+        df = df.dropna(how="all").copy()
+
+        # ── 2. Parseo robusto de fechas ──
         if self.date_column and self.date_column in df.columns:
+            # Si ya es datetime, no lo re-parseamos
             if not pd.api.types.is_datetime64_any_dtype(df[self.date_column]):
-                df[self.date_column] = pd.to_datetime(
-                    df[self.date_column], errors="coerce", dayfirst=True
+                # Convertir a texto limpio en minúsculas
+                date_series = df[self.date_column].astype(str).str.strip().str.lower()
+
+                # Mapa de meses en español
+                month_map = {
+                    "ene": "01", "feb": "02", "mar": "03", "abr": "04",
+                    "may": "05", "jun": "06", "jul": "07", "ago": "08",
+                    "sep": "09", "set": "09", "oct": "10", "nov": "11", "dic": "12"
+                }
+
+                # Reemplazar abreviaciones de mes por separador y número de mes
+                # Esto maneja casos como '20may' -> '20/05/', '21/may' -> '21//05/'
+                for month, num in month_map.items():
+                    date_series = date_series.str.replace(month, f"/{num}/", regex=False)
+
+                # Unificar múltiples barras diagonales, espacios y guiones en una sola barra
+                date_series = date_series.str.replace(r'[\s/-]+', '/', regex=True)
+                # Limpiar barras al inicio y al final
+                date_series = date_series.str.strip('/')
+
+                # Si falta el año (formatos DD/MM o D/M), agregar el año actual
+                current_year = pd.Timestamp.today().year
+                no_year_mask = date_series.str.match(r"^\d{1,2}/\d{1,2}$")
+                date_series = date_series.where(
+                    ~no_year_mask, date_series + f"/{current_year}"
                 )
+
+                # Convertir final
+                df[self.date_column] = pd.to_datetime(
+                    date_series, errors="coerce", dayfirst=True
+                )
+
         return df
 
     # ── Métodos abstractos ──────────────────────────────────────

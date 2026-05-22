@@ -48,6 +48,27 @@ class CitasInmobiliarias(BaseFormat):
         "Telefono Asesor": ColumnSpec(type="string",   required=False),
     }
 
+    # ── Preparación ──
+
+    def prepare(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Limpia y prepara el DataFrame de citas, aplicando reglas de unificación."""
+        # Primero ejecutar la preparación de la clase base (fechas, etc.)
+        df = super().prepare(df)
+
+        if "Inmueble" in df.columns:
+            # Asegurarse de que sea string y limpiar espacios externos
+            df["Inmueble"] = df["Inmueble"].astype(str).str.strip()
+
+            # Perez -> b. Perez
+            perez_mask = df["Inmueble"].str.contains("Perez", case=False, na=False)
+            df.loc[perez_mask, "Inmueble"] = "b. Perez"
+
+            # norteamerica -> Fl. Norteamerica
+            norte_mask = df["Inmueble"].str.contains("norteamerica", case=False, na=False)
+            df.loc[norte_mask, "Inmueble"] = "Fl. Norteamerica"
+
+        return df
+
     # ── KPIs ────────────────────────────────────────────────────
 
     def compute_kpis(self, df: pd.DataFrame) -> List[KPI]:
@@ -69,7 +90,11 @@ class CitasInmobiliarias(BaseFormat):
             .sort_values("Citas", ascending=False)
         )
 
-        # Donut
+        # Donut — ocultar etiquetas de segmentos pequeños (< 5%)
+        total = group_counts["Citas"].sum()
+        pcts = group_counts["Citas"] / total if total > 0 else group_counts["Citas"]
+        text_positions = ["outside" if p >= 0.05 else "none" for p in pcts]
+
         fig_donut = px.pie(
             group_counts,
             names=grouping,
@@ -79,7 +104,7 @@ class CitasInmobiliarias(BaseFormat):
         )
         fig_donut.update_traces(
             textinfo="percent+label",
-            textposition="outside",
+            textposition=text_positions,
             textfont=dict(color="rgba(224,224,255,0.8)", size=12),
             marker=dict(line=dict(color="#0f0c29", width=2)),
             hovertemplate=(
