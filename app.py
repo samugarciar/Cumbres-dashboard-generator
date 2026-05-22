@@ -215,8 +215,8 @@ if config["source"] == "sheets_new":
     )
     
     # Seleccionar la nueva conexión en session state para el próximo renderizado
-    sb_key = f"sb_dataset_{config['format_id']}"
-    st.session_state[sb_key] = f"🏠 {entry['name']} (Google Sheet)"
+    active_ds_key = f"active_ds_id_{config['format_id']}"
+    st.session_state[active_ds_key] = entry["id"]
     
     st.success(f"✅ Conexión **{entry['name']}** guardada y cargada exitosamente.")
     st.rerun()
@@ -316,8 +316,8 @@ elif config["source"] == "upload_new":
             entry = data_manager.save_dataset(
                 df, dataset_name, config["format_id"], uploaded_file.name
             )
-            sb_key = f"sb_dataset_{config['format_id']}"
-            st.session_state[sb_key] = f"📂 {entry['name']} (Archivo Local)"
+            active_ds_key = f"active_ds_id_{config['format_id']}"
+            st.session_state[active_ds_key] = entry["id"]
             
             st.success(f"✅ Dataset **{dataset_name}** guardado correctamente.")
             st.rerun()

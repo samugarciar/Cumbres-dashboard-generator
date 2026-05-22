@@ -93,23 +93,32 @@ def render_sidebar() -> Dict:
         ds_options["＋ Conectar Google Sheet..."] = "__new_sheet__"
         ds_options["＋ Subir archivo local..."] = "__new_local__"
         
-        # Clave en session state para persistir la selección del dataset
-        sb_key = f"sb_dataset_{format_id}"
+        # Clave en session state para persistir el ID del dataset activo
+        active_ds_key = f"active_ds_id_{format_id}"
         
         # Encontrar el índice por defecto
         options_list = list(ds_options.keys())
         default_index = 0
-        if sb_key in st.session_state and st.session_state[sb_key] in options_list:
-            default_index = options_list.index(st.session_state[sb_key])
+        
+        if active_ds_key in st.session_state:
+            active_id = st.session_state[active_ds_key]
+            for lbl, val in ds_options.items():
+                if val == active_id:
+                    default_index = options_list.index(lbl)
+                    break
+        elif options_list:
+            st.session_state[active_ds_key] = ds_options[options_list[0]]
             
         selected_ds_label = st.selectbox(
             "Conexión o Dataset",
             options=options_list,
             index=default_index,
-            key=sb_key,
             label_visibility="collapsed",
         )
         selected_ds_id = ds_options[selected_ds_label]
+        
+        # Mantener actualizada la clave de estado para esta interacción
+        st.session_state[active_ds_key] = selected_ds_id
         
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -184,8 +193,8 @@ def render_sidebar() -> Dict:
                     if st.button("🗑 Eliminar conexión", type="secondary", use_container_width=True, key="del_sheet_conn"):
                         data_manager.delete_dataset(selected_ds_id)
                         # Limpiar session state para no mantener selección inexistente
-                        if sb_key in st.session_state:
-                            del st.session_state[sb_key]
+                        if active_ds_key in st.session_state:
+                            del st.session_state[active_ds_key]
                         st.rerun()
                 else:
                     config["source"] = "local"
@@ -213,8 +222,8 @@ def render_sidebar() -> Dict:
                         
                     if st.button("🗑 Eliminar dataset", type="secondary", use_container_width=True, key="del_local_ds"):
                         data_manager.delete_dataset(selected_ds_id)
-                        if sb_key in st.session_state:
-                            del st.session_state[sb_key]
+                        if active_ds_key in st.session_state:
+                            del st.session_state[active_ds_key]
                         st.rerun()
 
         st.markdown("---")
