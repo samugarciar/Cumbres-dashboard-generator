@@ -60,14 +60,37 @@ def show_confirm_dialog(full_df):
         key="confirm_date_picker"
     )
     
+    # Inicializar el estado de selección masiva si no existe
+    if "select_all_state" not in st.session_state:
+        st.session_state["select_all_state"] = True
+        
     # Filtrar citas de esa fecha
     citas_dia = pd.DataFrame()
     if "Fecha" in full_df.columns:
         citas_dia = full_df[pd.to_datetime(full_df["Fecha"]).dt.date == selected_date]
         
+    citas_confirmar = pd.DataFrame()
     if not citas_dia.empty:
         st.success(f"🔍 Encontradas **{len(citas_dia)}** citas para el **{selected_date.strftime('%d/%m/%Y')}**.")
-        # Mostrar resumen interactivo y limpio
+        
+        # Botones de selección rápida
+        col_sel_1, col_sel_2 = st.columns(2)
+        with col_sel_1:
+            if st.button("✅ Seleccionar Todas", use_container_width=True, key="btn_select_all_rows"):
+                st.session_state["select_all_state"] = True
+                if "citas_editor" in st.session_state:
+                    st.session_state["citas_editor"] = {"edited_rows": {}, "added_rows": [], "deleted_rows": []}
+                st.rerun()
+        with col_sel_2:
+            if st.button("❌ Deseleccionar Todas", use_container_width=True, key="btn_deselect_all_rows"):
+                st.session_state["select_all_state"] = False
+                if "citas_editor" in st.session_state:
+                    st.session_state["citas_editor"] = {"edited_rows": {}, "added_rows": [], "deleted_rows": []}
+                st.rerun()
+                
+        st.markdown("<p style='font-size:0.82rem; color:rgba(224, 224, 255, 0.5); margin-bottom: 6px;'>Marca o desmarca citas individuales en la tabla:</p>", unsafe_allow_html=True)
+        
+        # Mostrar resumen interactivo con checkbox
         cols_to_show = [c for c in ["Hora", "Inmueble", "Asesor", "Tercero", "Telefono"] if c in citas_dia.columns]
         resumen_df = citas_dia[cols_to_show].copy()
         if "Tercero" in resumen_df.columns:
@@ -75,7 +98,32 @@ def show_confirm_dialog(full_df):
         if "Telefono" in resumen_df.columns:
             resumen_df = resumen_df.rename(columns={"Telefono": "Teléfono"})
             
-        st.dataframe(resumen_df.fillna(""), use_container_width=True, hide_index=True)
+        # Inyectar columna de checkboxes al inicio
+        resumen_df.insert(0, "Confirmar", st.session_state["select_all_state"])
+        
+        edited_resumen = st.data_editor(
+            resumen_df,
+            use_container_width=True,
+            hide_index=True,
+            key="citas_editor",
+            column_config={
+                "Confirmar": st.column_config.CheckboxColumn(
+                    "Confirmar",
+                    help="Selecciona para confirmar esta cita",
+                    default=True,
+                )
+            },
+            disabled=[c for c in resumen_df.columns if c != "Confirmar"]
+        )
+        
+        # Alinear con las citas originales usando indexación
+        selected_indices = edited_resumen[edited_resumen["Confirmar"] == True].index
+        citas_confirmar = citas_dia.loc[selected_indices]
+        
+        if not citas_confirmar.empty:
+            st.info(f"📋 Seleccionadas **{len(citas_confirmar)}** de **{len(citas_dia)}** citas para enviar.")
+        else:
+            st.warning("⚠️ No has seleccionado ninguna cita para confirmar.")
     else:
         st.warning(f"⚠️ No hay citas registradas en los datos para el **{selected_date.strftime('%d/%m/%Y')}**.")
         
@@ -87,8 +135,8 @@ def show_confirm_dialog(full_df):
         st.info("ℹ️ Define `n8n_webhook_url` en tus secretos de Streamlit para automatizar esto en producción. Mientras tanto, puedes ingresarlo aquí:")
         webhook_url = st.text_input("URL del Webhook de n8n", placeholder="https://tu-n8n.com/webhook/...", key="confirm_webhook_fallback")
         
-    # Deshabilitar si no hay citas en la fecha elegida
-    btn_disabled = citas_dia.empty or not webhook_url
+    # Deshabilitar si no hay citas elegidas o no hay webhook
+    btn_disabled = citas_confirmar.empty or not webhook_url
     
     if st.button("🚀 Confirmar y Enviar a n8n", type="primary", use_container_width=True, disabled=btn_disabled):
         if not webhook_url:
@@ -99,20 +147,20 @@ def show_confirm_dialog(full_df):
             try:
                 import requests
                 # Convertir fechas/horas a strings para el JSON
-                citas_json = citas_dia.copy()
+                citas_json = citas_confirmar.copy()
                 for col in citas_json.columns:
                     if pd.api.types.is_datetime64_any_dtype(citas_json[col]):
                         citas_json[col] = citas_json[col].dt.strftime('%Y-%m-%d %H:%M:%S')
                 
                 payload = {
                     "fecha_confirmacion": selected_date.isoformat(),
-                    "total_citas": len(citas_dia),
+                    "total_citas": len(citas_confirmar),
                     "citas": citas_json.fillna("").to_dict(orient="records")
                 }
                 
                 response = requests.post(webhook_url, json=payload, timeout=15)
                 if response.status_code in [200, 201]:
-                    st.toast("✅ Citas enviadas a n8n con éxito.")
+                    st.toast(f"✅ {len(citas_confirmar)} citas enviadas a n8n con éxito.")
                     st.success("🎉 ¡El webhook de confirmación se envió correctamente!")
                     st.rerun()
                 else:
@@ -220,13 +268,16 @@ st.markdown(
     .main-title {
         font-size: 2rem;
         font-weight: 700;
-        color: #448aff; /* Azul eléctrico premium */
+        background: linear-gradient(90deg, #b388ff, #82b1ff, #80d8ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         margin-bottom: 4px;
     }
     .main-subtitle {
         font-size: 0.95rem;
-        color: #82b1ff; /* Azul claro de alta visibilidad */
-        font-weight: 500;
+        color: rgba(224, 224, 255, 0.45);
+        font-weight: 400;
         margin-bottom: 28px;
     }
 
