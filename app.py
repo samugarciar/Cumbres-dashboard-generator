@@ -514,6 +514,32 @@ if fmt.id == "citas_inmobiliarias":
     with col_btn:
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
         if st.button("🔔 Confirmar Citas", type="primary", use_container_width=True, key="btn_confirmar_citas_trigger"):
+            # Si el origen es sheets_saved, refrescar antes de abrir el diálogo
+            if config.get("source") == "sheets_saved":
+                with st.spinner("⏳ Sincronizando datos en vivo desde Google Sheets..."):
+                    try:
+                        load_data.clear()
+                        fresh_df = load_data(config["sheet_url"], config["worksheet_name"])
+                        valid, errors = fmt.validate(fresh_df)
+                        if valid:
+                            prepared_df = fmt.prepare(fresh_df.copy())
+                            # Actualizar caché persistente en disco
+                            data_manager.save_sheets_connection(
+                                prepared_df,
+                                config["connection_name"],
+                                config["format_id"],
+                                config["sheet_url"],
+                                config["worksheet_name"],
+                                dataset_id=config["dataset_id"]
+                            )
+                            # Actualizar df en memoria
+                            df = prepared_df
+                            st.toast("🔄 Sincronización automática de Google Sheets completada.")
+                        else:
+                            st.error("❌ Los datos de la hoja no coinciden con el formato esperado. Abriendo diálogo con datos locales.")
+                    except Exception as exc:
+                        st.warning(f"⚠️ No se pudo sincronizar de Google Sheets (usando caché local): {exc}")
+            
             show_confirm_dialog(df)
     st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
