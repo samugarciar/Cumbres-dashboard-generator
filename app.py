@@ -129,18 +129,17 @@ def show_confirm_dialog(full_df):
         
     st.markdown("---")
     
-    # Obtener el webhook de los secretos o de un input fallback
+    # Obtener el webhook estrictamente desde los secretos
     webhook_url = st.secrets.get("n8n_webhook_url", "")
     if not webhook_url:
-        st.info("ℹ️ Define `n8n_webhook_url` en tus secretos de Streamlit para automatizar esto en producción. Mientras tanto, puedes ingresarlo aquí:")
-        webhook_url = st.text_input("URL del Webhook de n8n", placeholder="https://tu-n8n.com/webhook/...", key="confirm_webhook_fallback")
+        st.error("❌ Error de Configuración: La URL del Webhook (`n8n_webhook_url`) no está configurada en los secretos de Streamlit.")
+        btn_disabled = True
+    else:
+        btn_disabled = citas_confirmar.empty
         
-    # Deshabilitar si no hay citas elegidas o no hay webhook
-    btn_disabled = citas_confirmar.empty or not webhook_url
-    
     if st.button("🚀 Confirmar y Enviar a n8n", type="primary", use_container_width=True, disabled=btn_disabled):
         if not webhook_url:
-            st.error("Por favor proporciona una URL de webhook válida.")
+            st.error("URL de webhook no válida.")
             return
             
         with st.spinner("⏳ Enviando confirmación al workflow de n8n..."):
