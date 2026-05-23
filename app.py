@@ -220,16 +220,13 @@ st.markdown(
     .main-title {
         font-size: 2rem;
         font-weight: 700;
-        background: linear-gradient(90deg, #b388ff, #82b1ff, #80d8ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        color: #448aff; /* Azul eléctrico premium */
         margin-bottom: 4px;
     }
     .main-subtitle {
         font-size: 0.95rem;
-        color: rgba(224, 224, 255, 0.45);
-        font-weight: 400;
+        color: #82b1ff; /* Azul claro de alta visibilidad */
+        font-weight: 500;
         margin-bottom: 28px;
     }
 
