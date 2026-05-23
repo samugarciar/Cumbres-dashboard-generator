@@ -80,13 +80,11 @@ def show_confirm_dialog(full_df):
                 st.session_state["select_all_state"] = True
                 if "citas_editor" in st.session_state:
                     st.session_state["citas_editor"] = {"edited_rows": {}, "added_rows": [], "deleted_rows": []}
-                st.rerun()
         with col_sel_2:
             if st.button("❌ Deseleccionar Todas", use_container_width=True, key="btn_deselect_all_rows"):
                 st.session_state["select_all_state"] = False
                 if "citas_editor" in st.session_state:
                     st.session_state["citas_editor"] = {"edited_rows": {}, "added_rows": [], "deleted_rows": []}
-                st.rerun()
                 
         st.markdown("<p style='font-size:0.82rem; color:rgba(224, 224, 255, 0.5); margin-bottom: 6px;'>Marca o desmarca citas individuales en la tabla:</p>", unsafe_allow_html=True)
         
