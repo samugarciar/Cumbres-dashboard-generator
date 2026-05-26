@@ -127,8 +127,8 @@ def show_confirm_dialog(full_df):
         
     st.markdown("---")
     
-    # Obtener el webhook estrictamente desde los secretos
-    webhook_url = st.secrets.get("n8n_webhook_url", "")
+    # Obtener el webhook estrictamente desde los secretos (soportando nivel global o anidado en gcp_service_account debido al scope de TOML)
+    webhook_url = st.secrets.get("n8n_webhook_url") or st.secrets.get("gcp_service_account", {}).get("n8n_webhook_url", "")
     if not webhook_url:
         st.error("❌ Error de Configuración: La URL del Webhook (`n8n_webhook_url`) no está configurada en los secretos de Streamlit.")
         btn_disabled = True
