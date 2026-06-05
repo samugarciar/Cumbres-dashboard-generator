@@ -155,7 +155,14 @@ def show_confirm_dialog(full_df):
                     "citas": citas_json.fillna("").to_dict(orient="records")
                 }
                 
-                response = requests.post(webhook_url, json=payload, timeout=15)
+                # Cabeceras para simular un navegador real y evitar bloqueos de WAF (ModSecurity, BitNinja, etc.)
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                }
+                
+                response = requests.post(webhook_url, json=payload, headers=headers, timeout=15)
                 if response.status_code in [200, 201]:
                     st.toast(f"✅ {len(citas_confirmar)} citas enviadas a n8n con éxito.")
                     st.success("🎉 ¡El webhook de confirmación se envió correctamente!")
